@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ToDoリスト - 通知機能付き</title>
+    <title>TODOリスト - 通知機能付き</title>
     <style>
         * {
             margin: 0;
@@ -36,7 +36,6 @@
             margin-bottom: 30px;
         }
         
-        /* ページ内通知 */
         .notification-popup {
             position: fixed;
             top: 20px;
@@ -130,22 +129,6 @@
             background: #d4edda;
             color: #155724;
         }
-        .notification-status.inactive {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .test-notification-btn {
-            background: #ffc107;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-        .test-notification-btn:hover {
-            background: #ffb300;
-        }
         
         .input-section {
             background: #f8f9fa;
@@ -158,14 +141,14 @@
             gap: 10px;
             margin-bottom: 15px;
         }
-        input[type="text"], input[type="time"] {
+        input[type="text"], input[type="time"], input[type="datetime-local"] {
             flex: 1;
             padding: 12px;
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             font-size: 16px;
         }
-        input[type="text"]:focus, input[type="time"]:focus {
+        input[type="text"]:focus, input[type="time"]:focus, input[type="datetime-local"]:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -313,14 +296,24 @@
             font-size: 4em;
             margin-bottom: 20px;
         }
+        .external-notification-badge {
+            background: #51cf66;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📝 ToDoリスト</h1>
-        <p class="subtitle">タスクを管理して生産性アップ!</p>
+        <h1>📝 TODOリスト</h1>
+        <p class="subtitle">
+            タスクを管理して生産性アップ!
+            <span class="external-notification-badge">🔔 通知連携ON</span>
+        </p>
 
-        <!-- 通知設定 -->
         <div class="notification-settings">
             <h3>
                 🔔 通知設定
@@ -332,11 +325,8 @@
                 <button class="add-btn" onclick="saveNotificationTime()">保存</button>
             </div>
             <p style="margin-top: 10px; color: #666; font-size: 0.9em;">
-                ※ このページを開いている時に、設定した時刻に通知が表示されます
+                ※ 通知管理アプリに毎日のタスク確認通知を送信します
             </p>
-            <button class="test-notification-btn" onclick="showNotification('テスト通知', '通知機能が正常に動作しています! 🎉')">
-                テスト通知を表示
-            </button>
         </div>
 
         <div class="input-section">
@@ -351,12 +341,7 @@
             </div>
             <div class="input-row">
                 <input type="text" id="categoryInput" placeholder="カテゴリー (例: 学校、仕事)">
-                <select id="deadlineSelect">
-                    <option value="">期限なし</option>
-                    <option value="today">今日</option>
-                    <option value="tomorrow">明日</option>
-                    <option value="week">1週間後</option>
-                </select>
+                <input type="datetime-local" id="deadlineInput" placeholder="期限">
             </div>
         </div>
 
@@ -387,18 +372,14 @@
     <script>
         let todos = [];
         let currentFilter = 'all';
-        let notificationCheckInterval = null;
 
         window.onload = function() {
             loadTodos();
             renderTodos();
             loadNotificationTime();
-            startNotificationChecker();
         };
 
-        // ページ内通知を表示
         function showNotification(title, message) {
-            // 既存の通知があれば削除
             const existing = document.querySelector('.notification-popup');
             if (existing) {
                 existing.remove();
@@ -416,89 +397,55 @@
             
             document.body.appendChild(notification);
 
-            // 5秒後に自動で消す
             setTimeout(() => {
                 if (notification.parentElement) {
                     notification.classList.add('hide');
                     setTimeout(() => notification.remove(), 300);
                 }
             }, 5000);
-
-            // 音を鳴らす(ブラウザがサポートしている場合)
-            try {
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi78+efTRAMUKfj8LZjHAU4ktjyzHcrBSR3yPDej0AKE160'
-);
-                audio.play();
-            } catch (e) {}
         }
 
-        // 通知時刻を保存
+        function sendToNotificationApp(title, message, datetime) {
+            try {
+                const request = {
+                    title: title,
+                    message: message,
+                    datetime: datetime,
+                    source: 'TODOリストアプリ'
+                };
+                localStorage.setItem('notification-request', JSON.stringify(request));
+                console.log('通知を送信:', request);
+            } catch (error) {
+                console.error('通知送信エラー:', error);
+            }
+        }
+
         function saveNotificationTime() {
             const time = document.getElementById('notificationTime').value;
-            localStorage.setItem('notificationTime', time);
-            showNotification('設定保存', `通知時刻を ${time} に設定しました! ⏰`);
+            localStorage.setItem('todoNotificationTime', time);
+            
+            const today = new Date();
+            const [hours, minutes] = time.split(':');
+            const notifDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
+            
+            if (notifDate < new Date()) {
+                notifDate.setDate(notifDate.getDate() + 1);
+            }
+
+            sendToNotificationApp(
+                '📝 TODOリスト確認',
+                '今日のタスクを確認しましょう！',
+                notifDate.toISOString().slice(0, 16)
+            );
+            
+            showNotification('設定保存', `通知時刻を ${time} に設定し、通知アプリに送信しました! ⏰`);
         }
 
-        // 通知時刻を読み込み
         function loadNotificationTime() {
-            const saved = localStorage.getItem('notificationTime');
+            const saved = localStorage.getItem('todoNotificationTime');
             if (saved) {
                 document.getElementById('notificationTime').value = saved;
             }
-        }
-
-        // 通知チェッカーを開始
-        function startNotificationChecker() {
-            // 1分ごとにチェック
-            notificationCheckInterval = setInterval(() => {
-                checkAndShowNotification();
-            }, 60000); // 60秒
-
-            // すぐに1回チェック
-            setTimeout(checkAndShowNotification, 1000);
-        }
-
-        // 通知を表示するかチェック
-        function checkAndShowNotification() {
-            const now = new Date();
-            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            const notificationTime = localStorage.getItem('notificationTime') || '09:00';
-
-            // 最後に通知を送った日付を取得
-            const lastNotificationDate = localStorage.getItem('lastNotificationDate');
-            const today = now.toDateString();
-
-            // 設定時刻と一致 && 今日まだ通知していない
-            if (currentTime === notificationTime && lastNotificationDate !== today) {
-                sendDailyNotification();
-                localStorage.setItem('lastNotificationDate', today);
-            }
-        }
-
-        // 毎日の通知を送信
-        function sendDailyNotification() {
-            const activeTasks = todos.filter(t => !t.completed);
-            
-            if (activeTasks.length === 0) {
-                showNotification(
-                    '今日のタスク',
-                    '素晴らしい! 全てのタスクが完了しています! 🎉'
-                );
-                return;
-            }
-
-            // 優先度高のタスク
-            const highPriority = activeTasks.filter(t => t.priority === 'high');
-            
-            let message = `未完了タスク: ${activeTasks.length}件\n`;
-            if (highPriority.length > 0) {
-                message += `⚠️ 優先度高: ${highPriority.length}件\n`;
-                message += `トップタスク: ${highPriority[0].text}`;
-            } else {
-                message += `次のタスク: ${activeTasks[0].text}`;
-            }
-
-            showNotification('📝 今日のタスク', message);
         }
 
         function loadTodos() {
@@ -516,7 +463,7 @@
             const taskInput = document.getElementById('taskInput');
             const prioritySelect = document.getElementById('prioritySelect');
             const categoryInput = document.getElementById('categoryInput');
-            const deadlineSelect = document.getElementById('deadlineSelect');
+            const deadlineInput = document.getElementById('deadlineInput');
 
             const taskText = taskInput.value.trim();
             if (!taskText) {
@@ -524,12 +471,13 @@
                 return;
             }
 
+            const deadlineValue = deadlineInput.value;
             const task = {
                 id: Date.now(),
                 text: taskText,
                 priority: prioritySelect.value,
                 category: categoryInput.value.trim() || 'その他',
-                deadline: getDeadlineDate(deadlineSelect.value),
+                deadline: deadlineValue ? new Date(deadlineValue).toLocaleString('ja-JP') : null,
                 completed: false,
                 createdAt: new Date().toISOString()
             };
@@ -540,26 +488,34 @@
 
             showNotification('タスク追加', `「${taskText}」を追加しました!`);
 
+            if (deadlineValue) {
+                const deadlineDate = new Date(deadlineValue);
+                
+                const oneDayBefore = new Date(deadlineDate.getTime() - 24 * 60 * 60 * 1000);
+                if (oneDayBefore > new Date()) {
+                    sendToNotificationApp(
+                        `⏰ タスク期限: ${taskText}`,
+                        '明日が期限です！',
+                        oneDayBefore.toISOString().slice(0, 16)
+                    );
+                }
+
+                const oneHourBefore = new Date(deadlineDate.getTime() - 60 * 60 * 1000);
+                if (oneHourBefore > new Date()) {
+                    sendToNotificationApp(
+                        `🚨 タスク期限まもなく: ${taskText}`,
+                        '1時間後が期限です！',
+                        oneHourBefore.toISOString().slice(0, 16)
+                    );
+                }
+
+                showNotification('通知設定完了', '期限通知を通知アプリに送信しました！');
+            }
+
             taskInput.value = '';
             categoryInput.value = '';
-            deadlineSelect.value = '';
+            deadlineInput.value = '';
             taskInput.focus();
-        }
-
-        function getDeadlineDate(type) {
-            if (!type) return null;
-            
-            const today = new Date();
-            if (type === 'today') return today.toLocaleDateString('ja-JP');
-            if (type === 'tomorrow') {
-                today.setDate(today.getDate() + 1);
-                return today.toLocaleDateString('ja-JP');
-            }
-            if (type === 'week') {
-                today.setDate(today.getDate() + 7);
-                return today.toLocaleDateString('ja-JP');
-            }
-            return null;
         }
 
         function toggleTask(id) {
@@ -614,7 +570,7 @@
             if (filteredTodos.length === 0) {
                 todoList.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
+                        <div class="empty-state-icon">🔭</div>
                         <p>タスクがありません</p>
                     </div>
                 `;
